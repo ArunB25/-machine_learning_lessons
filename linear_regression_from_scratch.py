@@ -171,6 +171,8 @@ class linear_regression():
         grid_search_results = pd.DataFrame({'Parameters':parameter_combinations,'Training Scores':parameter_training_scores,'Parameter Score':parameter_score})
         return grid_search_results.sort_values(by=['Parameter Score'])
 
+
+
 if __name__ == "__main__":
     plot_on = False #display live plot of gradient decent and results of the 2 models 
     X, y = datasets.fetch_california_housing(return_X_y=True)
@@ -182,14 +184,16 @@ if __name__ == "__main__":
 
     lin_reg_model = linear_regression(X.shape[1])
 
+    ######### HYPER PARAMETER OPTIMISATION ######### 
     learningrate_param = [0.01,0.001,0.0001,0.00001,0.000001] #define the parameters and values to optimise for
     iterations_param = [2,4,8,16,32,64,128,256]
     batch_size_param = [32,64,128,256,512,1024]
     grid_search_results = lin_reg_model.grid_search_CV(X_train,y_train,learningrate_param,iterations_param,batch_size_param)
     print(grid_search_results.head())
-
     optimum_parameters = grid_search_results['Parameters'].iloc[0]
 
+
+    ######### Training model with optimum Hyperparameters ######### 
     start_time = time.time()
     lin_reg_model.fit(X_train,y_train,plot=plot_on,learningrate=optimum_parameters[0],iterations=optimum_parameters[1],batch_size=optimum_parameters[2])
     time_to_fit = round(time.time() - start_time, 3)
@@ -208,6 +212,7 @@ if __name__ == "__main__":
         plt.legend()
         plt.title(f'Made from scratch Linear Regression - MSE {scratch_mse} | Time to fit {time_to_fit}s')
 
+    ######### Compare with SKlean ######### 
     start_time = time.time()
     sklearn_model = linear_model.LinearRegression().fit(X_train, y_train) #create instance of the linear regression model
     time_to_fit = round(time.time() - start_time, 3)

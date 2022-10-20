@@ -68,3 +68,6 @@ Derivation to of loss with respect to weights
 
 #### Mini batching
 It can be very time consuming performing gradient decent calculations for the entire training data set every itteration. Mini batching invloves splitting the training data (full batch) up into smaller equally sized subsets (mini batches) which will be evalued over each epoch (on pass of entire training data). This process ensures that there will be enough memory free for the calculations if there is a very large training set.
+
+#### Hyper parameter optimisation
+To find the optimal hyperparameters cross validation was use with a grid search. So that the model doesnt over fit, cross validation was used, this is when the training data is split up into training data and valdiation data which is used to attain the score of the test. In this case, the training data was split into 5 even subsets, then each one is used to train the data and the other 4 is used to validate it and get a score. This is repeated for all 5 subsets with each one having a turn to train the model whilst the others validate the results. This process is repeated in the grid seach which tests every possible combination of a list of pramaters to assertain the optima hyperparameters for the dataset.
