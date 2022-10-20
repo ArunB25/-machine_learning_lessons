@@ -1,9 +1,12 @@
+from cmath import nan
 from ctypes import sizeof
-from turtle import title
+from random import uniform
+from turtle import color, title
 from sklearn import datasets , model_selection, linear_model,metrics
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
+import time
 
 class linear_regression():
     def __init__(self, n_features : int):
@@ -20,6 +23,12 @@ class linear_regression():
         '''
         ypred = np.dot(X, self.weight) + self.bias
         return ypred # return prediction
+
+    def score(self,X,y_true):
+        y_pred = self.predict(X)
+        u  = ((y_true - y_pred)** 2).sum()
+        v = ((y_true - y_true.mean()) ** 2).sum()
+        return (1 - (u/v))
 
     def fit_analytical(self, X_train, y_train):
         '''
@@ -41,83 +50,120 @@ class linear_regression():
         self.weight = weights
         self.bias = bias
 
-    def fit(self,X,y,learningrate = 0.001,iterations = 2000):
+    def get_params(self,deep=False):
+        return{'Weight':self.weight,'Bias':self.bias}
+
+    def fit(self,X,y,learningrate = 0.01,iterations = 4, plot = False, batch_size = 256):
         """ Find the multivarite regression model for the data set
         Parameters:
         X: independent variables matrix
         y: dependent variables matrix
-        Return value: the final theta vector and the plot of cost function
-        Credit to https://medium.com/@IwriteDSblog/gradient-descent-for-multivariable-regression-in-python-d430eb5d2cd8
+        learningrate: factor to reduce change in gradient to avoid deviation, typically between 0 and 1
+        iterations: number of times the entire dataset is evaluated
+        plot: display inreal time the gradient decent, only works with one parameter.
+        batch_size: for mini batch processing to improve efficiency, typically a factor of 32 (32,64,128,256,...)
+        Return value: the final weight and bias values
+        Credit to https://medium.com/@IwriteDSblog/gradient-descent-for-multivariable-regression-in-python-d430eb5d2cd8 & https://www.geeksforgeeks.org/ml-mini-batch-gradient-descent-with-python/
         """
+        def create_mini_batchs(X,y,batch_size):
+            '''
+            reduces size of full dataset to batch size
+            returns mini_batch containing all of the data broken up into batches
+            '''
+            mini_batches = []
+            data = np.hstack((X, y))
+            np.random.shuffle(data)
+            n_minibatches = data.shape[0] // batch_size
+            i = 0
+            for i in range(n_minibatches + 1):
+                mini_batch = data[i * batch_size:(i + 1)*batch_size, :]
+                X_mini = mini_batch[:, :-1]
+                Y_mini = mini_batch[:, -1].reshape((-1, 1))
+                mini_batches.append((X_mini, Y_mini))
+            if data.shape[0] % batch_size != 0:
+                mini_batch = data[i * batch_size:data.shape[0]]
+                X_mini = mini_batch[:, :-1]
+                Y_mini = mini_batch[:, -1].reshape((-1, 1))
+                mini_batches.append((X_mini, Y_mini))
+            return mini_batches
+
         def generateXvector(X):
             """ Taking the original independent variables matrix and add a row of 1 which corresponds to x_0
                 Parameters:
-                X:  independent variables matrix
                 Return value: the matrix that contains all the values in the dataset, not include the outcomes variables. 
             """
             vectorX = np.c_[np.ones((len(X), 1)), X]
             return vectorX
-        def theta_init(X):
-            """ Generate an initial value of vector θ from the original independent variables matrix
-                Parameters:
-                X:  independent variables matrix
-                Return value: a vector of theta filled with initial guess
-            """
-            theta = np.random.randn(len(X[0])+1, 1)
-            return theta
-        
-        y_new = np.reshape(y, (len(y), 1))   
-        cost_lst = []
-        vectorX = generateXvector(X)
-        theta = theta_init(X)
-        m = len(X)
+
+        theta = np.random.randn(len(X[0])+1, 1)
+        m = len(X) #length of dataset
+        if plot == True: #set up plot
+            plt.ion()
+            fig, ax = plt.subplots(figsize=(10, 8))
+            hypothesis_line, = ax.plot(0, 0,color = 'k')
+            training_data = ax.scatter(X,y,color='g', label='mini batch data',zorder=1)
+            plt.scatter(X,y,color='r', label='Training Data',zorder=0)
+            plt.suptitle("Gradient Decent")
+            plt.legend()
         for i in range(iterations):
-            gradients = 2/m * vectorX.T.dot(vectorX.dot(theta) - y_new)
-            theta = theta - learningrate * gradients
-            y_pred = vectorX.dot(theta)
-            cost_value = 1/(2*len(y))*((y_pred - y)**2) 
-            #Calculate the loss for each training instance
-            total = 0
-            for i in range(len(y)):
-                total += cost_value[i][0] 
-                #Calculate the cost function for each iteration
-            cost_lst.append(total)
-        bias = theta[0]
-        weights = theta[1:]
-        return weights,bias
+            mini_batches = create_mini_batchs(X, y, batch_size)
+            for mini_batch in mini_batches:
+                X_mini, y_mini = mini_batch  
+                mini_vectorX = generateXvector(X_mini) #create the parameter vector
+                gradients = 2/m * mini_vectorX.T.dot(mini_vectorX.dot(theta) - y_mini) #diferentiate loss with respect to theta(weights)
+                theta = theta - learningrate * gradients #move gradients in opposite direction to the increase of loss multiplied be the learning rate factor
+                if plot == True:
+                    hypothesis_line.set_xdata(X) #update x and y values and draw new line
+                    y_pred = X.dot(theta[1:])
+                    hypothesis_line.set_ydata(y_pred)
+                    training_data.set_offsets(np.c_[X_mini,y_mini])
+                    fig.canvas.draw()
+                    fig.canvas.flush_events()
+                    plt.title(f"Itteration {i} of {iterations}")
+
+        y_pred = X.dot(theta[1:]) #calculate predictions
+        loss = 1/m *sum((y_pred - y)**2)  #calculate the loss from predictions made
+        self.bias = theta[0]
+        self.weight = theta[1:]
+        return self
 
 if __name__ == "__main__":
-    X_all, y_all = datasets.fetch_california_housing(return_X_y=True)
-    # X = X_all[0:1000,:] https://medium.com/@IwriteDSblog/gradient-descent-for-multivariable-regression-in-python-d430eb5d2cd8
-    X = X_all[0:1000,0] 
-    X = np.reshape(X, (-1, 1))
-    y = y_all[0:1000]
+    plot_on = True #display live plot of gradient decent and results of the 2 models 
+    X, y = datasets.fetch_california_housing(return_X_y=True)
+    X = X[:,0:1] ##reduce parameters to 1
+    y = y.reshape((-1, 1)) #convert to column vector
     X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.3)
-    lin_reg_model = linear_regression(X.shape[1])
-    weights,bias = lin_reg_model.fit(X_train,y_train)
-    print(f"Scratch models coefs:{weights} | Intercept:{bias}")
-    lin_reg_model.set_params(weights,bias)
-    scratch_mse = round(metrics.mean_squared_error(y_test, lin_reg_model.predict(X_test)),5)
-    plt.figure(1)
-    plt.subplot(2, 1, 1)
-    plt.scatter(X_train,y_train ,color='g', label='Training Data',zorder=0)
-    plt.plot(X_train, lin_reg_model.predict(X_train),color='b',label='Hypothesis',zorder=1)
-    plt.scatter(X_test, lin_reg_model.predict(X_test),color='r',label='Predicted Test Data',zorder=2)
-    plt.scatter(X_test, y_test,color='k',label='Real Test Data', marker="2",zorder=3)
-    plt.ylabel('House Value')
-    plt.legend()
-    plt.title(f'Made from scratch Linear Regression - MSE {scratch_mse}')
-
-    sklearn_model = linear_model.LinearRegression().fit(X_train, y_train) #create instance of the linear regression model
-    print(f"SKlearn coefs:{sklearn_model.coef_} | Intercept:{sklearn_model.intercept_}")
-    sklearn_mse = round(metrics.mean_squared_error(y_test, sklearn_model.predict(X_test)),5)
-    plt.subplot(2, 1, 2)
-    plt.scatter(X_train,y_train ,color='g', label='Training Data',zorder=0)
-    plt.plot(X_train, sklearn_model.predict(X_train),color='b',label='Hypothesis',zorder=1)
-    plt.scatter(X_test, sklearn_model.predict(X_test),color='r',label='Predicted Test Data',zorder=2)
-    plt.scatter(X_test, y_test,color='k',label='Real Test Data', marker="2",zorder=3)
-    plt.ylabel('House Value')
-    plt.legend()
-    plt.title(f'SKlearn Linear Regression - MSE {scratch_mse}')
     
-    plt.show()
+
+    lin_reg_model = linear_regression(X.shape[1])
+    start_time = time.time()
+    lin_reg_model.fit(X_train,y_train,plot=plot_on)
+    time_to_fit = round(time.time() - start_time, 3)
+    scratch_mse = round(metrics.mean_squared_error(y_test, lin_reg_model.predict(X_test)),5)
+    print(f"Scratch MSE:{scratch_mse} | Time to fit {time_to_fit}s | Scratch models coefs:{lin_reg_model.weight} | Intercept:{lin_reg_model.bias}")
+    if plot_on:
+        plt.figure
+        plt.subplot(2, 1, 1)
+        plt.scatter(X_train,y_train ,color='g', label='Training Data',zorder=0)
+        plt.plot(X_train, lin_reg_model.predict(X_train),color='b',label='Hypothesis',zorder=1)
+        plt.scatter(X_test, lin_reg_model.predict(X_test),color='r',label='Predicted Test Data',zorder=2)
+        plt.scatter(X_test, y_test,color='k',label='Real Test Data', marker="2",zorder=3)
+        plt.ylabel('House Value')
+        plt.legend()
+        plt.title(f'Made from scratch Linear Regression - MSE {scratch_mse} | Time to fit {time_to_fit}s')
+
+    start_time = time.time()
+    sklearn_model = linear_model.LinearRegression().fit(X_train, y_train) #create instance of the linear regression model
+    time_to_fit = round(time.time() - start_time, 3)
+    sklearn_mse = round(metrics.mean_squared_error(y_test, sklearn_model.predict(X_test)),5)
+    print(f"Sklearn MSE:{sklearn_mse} | Time to fit {time_to_fit}s |SKlearn coefs:{sklearn_model.coef_} | Intercept:{sklearn_model.intercept_}")
+    if plot_on:
+        plt.subplot(2, 1, 2)
+        plt.scatter(X_train,y_train ,color='g', label='Training Data',zorder=0)
+        plt.plot(X_train, sklearn_model.predict(X_train),color='b',label='Hypothesis',zorder=1)
+        plt.scatter(X_test, sklearn_model.predict(X_test),color='r',label='Predicted Test Data',zorder=2)
+        plt.scatter(X_test, y_test,color='k',label='Real Test Data', marker="2",zorder=3)
+        plt.ylabel('House Value')
+        plt.legend()
+        plt.title(f'SKlearn Linear Regression - MSE {sklearn_mse} | Time to fit {time_to_fit}s')
+        plt.show()
