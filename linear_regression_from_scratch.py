@@ -65,27 +65,22 @@ class linear_regression():
         Return value: the final weight and bias values
         Credit to https://medium.com/@IwriteDSblog/gradient-descent-for-multivariable-regression-in-python-d430eb5d2cd8 & https://www.geeksforgeeks.org/ml-mini-batch-gradient-descent-with-python/
         """
-        def create_mini_batchs(X,y,batch_size):
+
+        def iterate_minibatches(X, y, batchsize, shuffle=True):
             '''
             reduces size of full dataset to batch size
             returns mini_batch containing all of the data broken up into batches
             '''
-            mini_batches = []
-            data = np.hstack((X, y))
-            np.random.shuffle(data)
-            n_minibatches = data.shape[0] // batch_size
-            i = 0
-            for i in range(n_minibatches + 1):
-                mini_batch = data[i * batch_size:(i + 1)*batch_size, :]
-                X_mini = mini_batch[:, :-1]
-                Y_mini = mini_batch[:, -1].reshape((-1, 1))
-                mini_batches.append((X_mini, Y_mini))
-            if data.shape[0] % batch_size != 0:
-                mini_batch = data[i * batch_size:data.shape[0]]
-                X_mini = mini_batch[:, :-1]
-                Y_mini = mini_batch[:, -1].reshape((-1, 1))
-                mini_batches.append((X_mini, Y_mini))
-            return mini_batches
+            assert X.shape[0] == y.shape[0]
+            if shuffle:
+                indices = np.arange(X.shape[0])
+                np.random.shuffle(indices)
+            for start_idx in range(0, X.shape[0] - batchsize + 1, batchsize):
+                if shuffle:
+                    excerpt = indices[start_idx:start_idx + batchsize]
+                else:
+                    excerpt = slice(start_idx, start_idx + batchsize)
+                yield X[excerpt], y[excerpt]
 
         def generateXvector(X):
             """ Taking the original independent variables matrix and add a row of 1 which corresponds to x_0
@@ -106,9 +101,8 @@ class linear_regression():
             plt.suptitle("Gradient Decent")
             plt.legend()
         for i in range(iterations):
-            mini_batches = create_mini_batchs(X, y, batch_size)
-            for mini_batch in mini_batches:
-                X_mini, y_mini = mini_batch  
+            for batch in iterate_minibatches(X, y, batch_size):
+                X_mini, y_mini = batch
                 mini_vectorX = generateXvector(X_mini) #create the parameter vector
                 gradients = 2/m * mini_vectorX.T.dot(mini_vectorX.dot(theta) - y_mini) #diferentiate loss with respect to theta(weights)
                 theta = theta - learningrate * gradients #move gradients in opposite direction to the increase of loss multiplied be the learning rate factor
@@ -128,12 +122,11 @@ class linear_regression():
         return self
 
 if __name__ == "__main__":
-    plot_on = False #display live plot of gradient decent and results of the 2 models 
+    plot_on = True #display live plot of gradient decent and results of the 2 models 
     X, y = datasets.fetch_california_housing(return_X_y=True)
     X = X[:,0:1] ##reduce parameters to 1
     y = y.reshape((-1, 1)) #convert to column vector
     X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.3)
-    
 
     lin_reg_model = linear_regression(X.shape[1])
     start_time = time.time()
