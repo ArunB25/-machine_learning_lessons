@@ -1,9 +1,17 @@
+from cmath import nan
 from ctypes import sizeof
-from turtle import title
+from random import uniform
+from turtle import color, title
+from unittest import result
 from sklearn import datasets , model_selection, linear_model,metrics
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
+import time
+from itertools import product
+import pandas as pd
+from statistics import mean
+
 
 class linear_regression():
     def __init__(self, n_features : int):
@@ -20,6 +28,13 @@ class linear_regression():
         '''
         ypred = np.dot(X, self.weight) + self.bias
         return ypred # return prediction
+
+    def score(self,X,y_true,round_to = 4):
+        y_pred = self.predict(X)
+        # u  = ((y_true - y_pred)** 2).sum()
+        # v = ((y_true - y_true.mean()) ** 2).sum()
+        # return round((1 - (u/v)),round_to)
+        return round(metrics.mean_squared_error(y_true, y_pred),round_to)
 
     def fit_analytical(self, X_train, y_train):
         '''
@@ -41,83 +56,175 @@ class linear_regression():
         self.weight = weights
         self.bias = bias
 
-    def fit(self,X,y,learningrate = 0.001,iterations = 2000):
+    def get_params(self,deep=False):
+        return{'Weight':self.weight,'Bias':self.bias}
+
+    def fit(self,X,y,learningrate = 0.01,iterations = 64, plot = False, batch_size = 32):
         """ Find the multivarite regression model for the data set
         Parameters:
         X: independent variables matrix
         y: dependent variables matrix
-        Return value: the final theta vector and the plot of cost function
-        Credit to https://medium.com/@IwriteDSblog/gradient-descent-for-multivariable-regression-in-python-d430eb5d2cd8
+        learningrate: factor to reduce change in gradient to avoid deviation, typically between 0 and 1
+        iterations: number of times the entire dataset is evaluated
+        plot: display inreal time the gradient decent, only works with one parameter.
+        batch_size: for mini batch processing to improve efficiency, typically a factor of 32 (32,64,128,256,...)
+        Return value: the final weight and bias values
+        Credit to https://medium.com/@IwriteDSblog/gradient-descent-for-multivariable-regression-in-python-d430eb5d2cd8 & https://www.geeksforgeeks.org/ml-mini-batch-gradient-descent-with-python/
         """
+
+        def iterate_minibatches(X, y, batchsize, shuffle=True):
+            '''
+            reduces size of full dataset to batch size
+            returns mini_batch containing all of the data broken up into batches
+            '''
+            assert X.shape[0] == y.shape[0]
+            if shuffle:
+                indices = np.arange(X.shape[0])
+                np.random.seed(2) #set the random seed
+                np.random.shuffle(indices)
+            for start_idx in range(0, X.shape[0] - batchsize + 1, batchsize): #for every batch in data
+                if shuffle:
+                    excerpt = indices[start_idx:start_idx + batchsize]
+                else:
+                    excerpt = slice(start_idx, start_idx + batchsize) #excerpt is the in
+                yield X[excerpt], y[excerpt]
+
         def generateXvector(X):
             """ Taking the original independent variables matrix and add a row of 1 which corresponds to x_0
                 Parameters:
-                X:  independent variables matrix
                 Return value: the matrix that contains all the values in the dataset, not include the outcomes variables. 
             """
             vectorX = np.c_[np.ones((len(X), 1)), X]
             return vectorX
-        def theta_init(X):
-            """ Generate an initial value of vector θ from the original independent variables matrix
-                Parameters:
-                X:  independent variables matrix
-                Return value: a vector of theta filled with initial guess
-            """
-            theta = np.random.randn(len(X[0])+1, 1)
-            return theta
-        
-        y_new = np.reshape(y, (len(y), 1))   
-        cost_lst = []
-        vectorX = generateXvector(X)
-        theta = theta_init(X)
-        m = len(X)
+
+        theta = np.random.randn(len(X[0])+1, 1)
+        m = len(X) #length of dataset
+        if plot == True: #set up plot
+            plt.ion()
+            fig, ax = plt.subplots(figsize=(10, 8))
+            hypothesis_line, = ax.plot(0, 0,color = 'k')
+            training_data = ax.scatter(X,y,color='g', label='mini batch data',zorder=1)
+            plt.scatter(X,y,color='r', label='Training Data',zorder=0)
+            plt.suptitle("Gradient Decent")
+            plt.legend()
         for i in range(iterations):
-            gradients = 2/m * vectorX.T.dot(vectorX.dot(theta) - y_new)
-            theta = theta - learningrate * gradients
-            y_pred = vectorX.dot(theta)
-            cost_value = 1/(2*len(y))*((y_pred - y)**2) 
-            #Calculate the loss for each training instance
-            total = 0
-            for i in range(len(y)):
-                total += cost_value[i][0] 
-                #Calculate the cost function for each iteration
-            cost_lst.append(total)
-        bias = theta[0]
-        weights = theta[1:]
-        return weights,bias
+            for batch in iterate_minibatches(X, y, batch_size):
+                X_mini, y_mini = batch
+                mini_vectorX = generateXvector(X_mini) #create the parameter vector
+                gradients = 2/m * mini_vectorX.T.dot(mini_vectorX.dot(theta) - y_mini) #diferentiate loss with respect to theta(weights)
+                theta = theta - learningrate * gradients #move gradients in opposite direction to the increase of loss multiplied be the learning rate factor
+                if plot == True:
+                    hypothesis_line.set_xdata(X) #update x and y values and draw new line
+                    y_pred = X.dot(theta[1:])
+                    hypothesis_line.set_ydata(y_pred)
+                    training_data.set_offsets(np.c_[X_mini,y_mini])
+                    fig.canvas.draw()
+                    fig.canvas.flush_events()
+                    plt.title(f"Itteration {i} of {iterations}")
+
+        y_pred = X.dot(theta[1:]) #calculate predictions
+        loss = 1/m *sum((y_pred - y)**2)  #calculate the loss from predictions made
+        self.bias = theta[0]
+        self.weight = theta[1:]
+        return self
+
+
+    def grid_search_CV(self,X_train,y_train,learningrate_param:list = [0.001],iterations_param:list = [4], batch_size_param:list = [128],num_training_batches:int = 5):
+        '''
+        X_train: entire inputs training dataset
+        y_train: entire outputs training dataset
+        learningrate_param:learning rates to be evaluataed
+        iterations_param:iterations to be evaluataed
+        batch_size_param:batch sizes to be evaluataed
+        num_training_batches: number of training batches
+
+        Script breaks up training data into num_training_batches subsets to be cross validated in a grid search
+        Returns dataframe of results 
+        '''
+        def CV_training_batches(X_train,y_train,num_training_batches):
+            training_size = X_train.shape[0]//num_training_batches
+            X_training_batches = []
+            y_training_batches = []
+            for start_idx in range(0, X_train.shape[0] - training_size + 1, training_size): #split the training dataset into 5 batches
+                excerpt = slice(start_idx, start_idx + training_size)
+                X_training_batches.append(X_train[excerpt])
+                y_training_batches.append(y_train[excerpt])
+            return X_training_batches,y_training_batches
+
+        X_training_batches,y_training_batches = CV_training_batches(X_train,y_train,num_training_batches)
+        parameter_combinations = list(product(learningrate_param, iterations_param,batch_size_param)) #create a list of all posible parameter value combinations
+        batch_indexs = range(0,num_training_batches)
+        parameter_training_scores = []
+        parameter_score = []
+        for parameter in parameter_combinations: #for each parameter combination
+            training_avg_score = []
+            for training_batch in batch_indexs:#for each training batch fit the model and get the score of that batch
+                lin_reg_model.fit(X_training_batches[training_batch],y_training_batches[training_batch],plot=plot_on,learningrate=parameter[0],iterations=parameter[1],batch_size=parameter[2])
+                validation_scores = []
+                for i in batch_indexs:
+                 if i!=training_batch:
+                    validation_scores.append(lin_reg_model.score(X_training_batches[i],y_training_batches[i])) 
+                training_avg_score.append(mean(validation_scores))
+            parameter_training_scores.append(training_avg_score)
+            parameter_score.append(mean(training_avg_score))
+
+        grid_search_results = pd.DataFrame({'Parameters':parameter_combinations,'Training Scores':parameter_training_scores,'Parameter Score':parameter_score})
+        return grid_search_results.sort_values(by=['Parameter Score'])
+
+
 
 if __name__ == "__main__":
-    X_all, y_all = datasets.fetch_california_housing(return_X_y=True)
-    # X = X_all[0:1000,:] https://medium.com/@IwriteDSblog/gradient-descent-for-multivariable-regression-in-python-d430eb5d2cd8
-    X = X_all[0:1000,0] 
-    X = np.reshape(X, (-1, 1))
-    y = y_all[0:1000]
+    plot_on = False #display live plot of gradient decent and results of the 2 models 
+    X, y = datasets.fetch_california_housing(return_X_y=True)
+    X = X[:,0:1] ##reduce parameters to 1
+    y = y.reshape((-1, 1)) #convert to column vector
     X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.3)
-    lin_reg_model = linear_regression(X.shape[1])
-    weights,bias = lin_reg_model.fit(X_train,y_train)
-    print(f"Scratch models coefs:{weights} | Intercept:{bias}")
-    lin_reg_model.set_params(weights,bias)
-    scratch_mse = round(metrics.mean_squared_error(y_test, lin_reg_model.predict(X_test)),5)
-    plt.figure(1)
-    plt.subplot(2, 1, 1)
-    plt.scatter(X_train,y_train ,color='g', label='Training Data',zorder=0)
-    plt.plot(X_train, lin_reg_model.predict(X_train),color='b',label='Hypothesis',zorder=1)
-    plt.scatter(X_test, lin_reg_model.predict(X_test),color='r',label='Predicted Test Data',zorder=2)
-    plt.scatter(X_test, y_test,color='k',label='Real Test Data', marker="2",zorder=3)
-    plt.ylabel('House Value')
-    plt.legend()
-    plt.title(f'Made from scratch Linear Regression - MSE {scratch_mse}')
 
-    sklearn_model = linear_model.LinearRegression().fit(X_train, y_train) #create instance of the linear regression model
-    print(f"SKlearn coefs:{sklearn_model.coef_} | Intercept:{sklearn_model.intercept_}")
-    sklearn_mse = round(metrics.mean_squared_error(y_test, sklearn_model.predict(X_test)),5)
-    plt.subplot(2, 1, 2)
-    plt.scatter(X_train,y_train ,color='g', label='Training Data',zorder=0)
-    plt.plot(X_train, sklearn_model.predict(X_train),color='b',label='Hypothesis',zorder=1)
-    plt.scatter(X_test, sklearn_model.predict(X_test),color='r',label='Predicted Test Data',zorder=2)
-    plt.scatter(X_test, y_test,color='k',label='Real Test Data', marker="2",zorder=3)
-    plt.ylabel('House Value')
-    plt.legend()
-    plt.title(f'SKlearn Linear Regression - MSE {scratch_mse}')
     
-    plt.show()
+
+    lin_reg_model = linear_regression(X.shape[1])
+
+    ######### HYPER PARAMETER OPTIMISATION ######### 
+    learningrate_param = [0.01,0.001,0.0001,0.00001,0.000001] #define the parameters and values to optimise for
+    iterations_param = [2,4,8,16,32,64,128,256]
+    batch_size_param = [32,64,128,256,512,1024]
+    grid_search_results = lin_reg_model.grid_search_CV(X_train,y_train,learningrate_param,iterations_param,batch_size_param)
+    print(grid_search_results.head())
+    optimum_parameters = grid_search_results['Parameters'].iloc[0]
+
+
+    ######### Training model with optimum Hyperparameters ######### 
+    start_time = time.time()
+    lin_reg_model.fit(X_train,y_train,plot=plot_on,learningrate=optimum_parameters[0],iterations=optimum_parameters[1],batch_size=optimum_parameters[2])
+    time_to_fit = round(time.time() - start_time, 3)
+    scratch_mse = round(metrics.mean_squared_error(y_test, lin_reg_model.predict(X_test)),5)
+    print(f"Scratch MSE:{scratch_mse} | Time to fit {time_to_fit}s | Scratch models coefs:{lin_reg_model.weight} | Intercept:{lin_reg_model.bias}")
+   
+    plot_on = True
+    if plot_on:
+        plt.figure
+        plt.subplot(2, 1, 1)
+        plt.scatter(X_train,y_train ,color='g', label='Training Data',zorder=0)
+        plt.plot(X_train, lin_reg_model.predict(X_train),color='b',label='Hypothesis',zorder=1)
+        plt.scatter(X_test, lin_reg_model.predict(X_test),color='r',label='Predicted Test Data',zorder=2)
+        plt.scatter(X_test, y_test,color='k',label='Real Test Data', marker="2",zorder=3)
+        plt.ylabel('House Value')
+        plt.legend()
+        plt.title(f'Made from scratch Linear Regression - MSE {scratch_mse} | Time to fit {time_to_fit}s')
+
+    ######### Compare with SKlean ######### 
+    start_time = time.time()
+    sklearn_model = linear_model.LinearRegression().fit(X_train, y_train) #create instance of the linear regression model
+    time_to_fit = round(time.time() - start_time, 3)
+    sklearn_mse = round(metrics.mean_squared_error(y_test, sklearn_model.predict(X_test)),5)
+    print(f"Sklearn MSE:{sklearn_mse} | Time to fit {time_to_fit}s |SKlearn coefs:{sklearn_model.coef_} | Intercept:{sklearn_model.intercept_}")
+    if plot_on:
+        plt.subplot(2, 1, 2)
+        plt.scatter(X_train,y_train ,color='g', label='Training Data',zorder=0)
+        plt.plot(X_train, sklearn_model.predict(X_train),color='b',label='Hypothesis',zorder=1)
+        plt.scatter(X_test, sklearn_model.predict(X_test),color='r',label='Predicted Test Data',zorder=2)
+        plt.scatter(X_test, y_test,color='k',label='Real Test Data', marker="2",zorder=3)
+        plt.ylabel('House Value')
+        plt.legend()
+        plt.title(f'SKlearn Linear Regression - MSE {sklearn_mse} | Time to fit {time_to_fit}s')
+        plt.show()
