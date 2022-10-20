@@ -128,7 +128,7 @@ class linear_regression():
         return self
 
 if __name__ == "__main__":
-    plot_on = True #display live plot of gradient decent and results of the 2 models 
+    plot_on = False #display live plot of gradient decent and results of the 2 models 
     X, y = datasets.fetch_california_housing(return_X_y=True)
     X = X[:,0:1] ##reduce parameters to 1
     y = y.reshape((-1, 1)) #convert to column vector

@@ -65,3 +65,6 @@ Derivation to of loss with respect to weights
     W = W - dl/dw*(learning rate)
 
 5. Repeat for n itterations
+
+#### Mini batching
+It can be very time consuming performing gradient decent calculations for the entire training data set every itteration. Mini batching invloves splitting the training data (full batch) up into smaller equally sized subsets (mini batches) which will be evalued over each epoch (on pass of entire training data). This process ensures that there will be enough memory free for the calculations if there is a very large training set.
