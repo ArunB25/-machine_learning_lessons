@@ -31,10 +31,9 @@ class linear_regression():
 
     def score(self,X,y_true,round_to = 4):
         y_pred = self.predict(X)
-        # u  = ((y_true - y_pred)** 2).sum()
-        # v = ((y_true - y_true.mean()) ** 2).sum()
-        # return round((1 - (u/v)),round_to)
-        return round(metrics.mean_squared_error(y_true, y_pred),round_to)
+        ss_fit  = ((y_true - y_pred)** 2).sum()
+        ss_mean = ((y_true - y_true.mean()) ** 2).sum()
+        return round(((ss_mean-ss_fit)/ss_mean),round_to)
 
     def fit_analytical(self, X_train, y_train):
         '''
@@ -169,7 +168,7 @@ class linear_regression():
             parameter_score.append(mean(training_avg_score))
 
         grid_search_results = pd.DataFrame({'Parameters':parameter_combinations,'Training Scores':parameter_training_scores,'Parameter Score':parameter_score})
-        return grid_search_results.sort_values(by=['Parameter Score'])
+        return grid_search_results.sort_values(by=['Parameter Score'],ascending=False)
 
 
 
@@ -197,9 +196,9 @@ if __name__ == "__main__":
     start_time = time.time()
     lin_reg_model.fit(X_train,y_train,plot=plot_on,learningrate=optimum_parameters[0],iterations=optimum_parameters[1],batch_size=optimum_parameters[2])
     time_to_fit = round(time.time() - start_time, 3)
-    scratch_mse = round(metrics.mean_squared_error(y_test, lin_reg_model.predict(X_test)),5)
-    print(f"Scratch MSE:{scratch_mse} | Time to fit {time_to_fit}s | Scratch models coefs:{lin_reg_model.weight} | Intercept:{lin_reg_model.bias}")
-   
+    scratch_score = lin_reg_model.score(X_train,y_train) # R^2 with training data
+    scratch_mse = round(metrics.mean_squared_error(y_test, lin_reg_model.predict(X_test)),5) #MSE with test data
+    print(f"Scratch score(R^2): {scratch_score} | Scratch MSE:{scratch_mse} | Time to fit {time_to_fit}s | Scratch models coefs:{lin_reg_model.weight} | Intercept:{lin_reg_model.bias}")
     plot_on = True
     if plot_on:
         plt.figure
@@ -210,14 +209,15 @@ if __name__ == "__main__":
         plt.scatter(X_test, y_test,color='k',label='Real Test Data', marker="2",zorder=3)
         plt.ylabel('House Value')
         plt.legend()
-        plt.title(f'Made from scratch Linear Regression - MSE {scratch_mse} | Time to fit {time_to_fit}s')
+        plt.title(f'Made from scratch Linear Regression - Score {scratch_score} | Time to fit {time_to_fit}s')
 
     ######### Compare with SKlean ######### 
     start_time = time.time()
     sklearn_model = linear_model.LinearRegression().fit(X_train, y_train) #create instance of the linear regression model
     time_to_fit = round(time.time() - start_time, 3)
+    sklearn_score = sklearn_model.score(X_train,y_train)
     sklearn_mse = round(metrics.mean_squared_error(y_test, sklearn_model.predict(X_test)),5)
-    print(f"Sklearn MSE:{sklearn_mse} | Time to fit {time_to_fit}s |SKlearn coefs:{sklearn_model.coef_} | Intercept:{sklearn_model.intercept_}")
+    print(f"Sklearn score(R^2): {sklearn_score} | Sklearn MSE:{sklearn_mse} | Time to fit {time_to_fit}s |SKlearn coefs:{sklearn_model.coef_} | Intercept:{sklearn_model.intercept_}")
     if plot_on:
         plt.subplot(2, 1, 2)
         plt.scatter(X_train,y_train ,color='g', label='Training Data',zorder=0)
@@ -226,5 +226,5 @@ if __name__ == "__main__":
         plt.scatter(X_test, y_test,color='k',label='Real Test Data', marker="2",zorder=3)
         plt.ylabel('House Value')
         plt.legend()
-        plt.title(f'SKlearn Linear Regression - MSE {sklearn_mse} | Time to fit {time_to_fit}s')
+        plt.title(f'SKlearn Linear Regression - Score {sklearn_score} | Time to fit {time_to_fit}s')
         plt.show()
