@@ -1,3 +1,4 @@
+from cProfile import label
 from cmath import nan
 from ctypes import sizeof
 from random import uniform
@@ -30,10 +31,17 @@ class linear_regression():
         return ypred # return prediction
 
     def score(self,X,y_true,round_to = 4):
+        '''
+        Takes in Inputs and targets and returns R^2
+        '''
         y_pred = self.predict(X)
         ss_fit  = ((y_true - y_pred)** 2).sum()
         ss_mean = ((y_true - y_true.mean()) ** 2).sum()
         return round(((ss_mean-ss_fit)/ss_mean),round_to)
+
+    def loss(self,X,y_true,round_to = 4):
+        y_pred = self.predict(X)
+        return round(((y_true - y_pred)** 2).mean(),round_to)
 
     def fit_analytical(self, X_train, y_train):
         '''
@@ -58,7 +66,7 @@ class linear_regression():
     def get_params(self,deep=False):
         return{'Weight':self.weight,'Bias':self.bias}
 
-    def fit(self,X,y,learningrate = 0.01,iterations = 64, plot = False, batch_size = 32):
+    def fit(self,X,y,learningrate = 0.01,iterations = 256, plot = False, batch_size = 64, show_loss = False):
         """ Find the multivarite regression model for the data set
         Parameters:
         X: independent variables matrix
@@ -70,6 +78,9 @@ class linear_regression():
         Return value: the final weight and bias values
         Credit to https://medium.com/@IwriteDSblog/gradient-descent-for-multivariable-regression-in-python-d430eb5d2cd8 & https://www.geeksforgeeks.org/ml-mini-batch-gradient-descent-with-python/
         """
+        def split_training_validation(X,y, validation_size=0.1):
+             X_train, X_val, y_train, y_val = model_selection.train_test_split(X, y, test_size=validation_size)
+             return X_train, X_val, y_train, y_val
 
         def iterate_minibatches(X, y, batchsize, shuffle=True):
             '''
@@ -96,35 +107,62 @@ class linear_regression():
             vectorX = np.c_[np.ones((len(X), 1)), X]
             return vectorX
 
-        theta = np.random.randn(len(X[0])+1, 1)
-        m = len(X) #length of dataset
+        X_train, X_val, y_train, y_val = split_training_validation(X,y)    
+        training_loss = []
+        validation_loss = []
+        theta = np.random.randn(len(X_train[0])+1, 1)
+        m = len(X_train) #length of dataset
         if plot == True: #set up plot
             plt.ion()
             fig, ax = plt.subplots(figsize=(10, 8))
             hypothesis_line, = ax.plot(0, 0,color = 'k')
-            training_data = ax.scatter(X,y,color='g', label='mini batch data',zorder=1)
-            plt.scatter(X,y,color='r', label='Training Data',zorder=0)
+            #training_data = ax.scatter(X_train,y_train,color='g', label='mini batch data',zorder=1)
+            plt.scatter(X_train,y_train,color='r', label='Training Data',zorder=0)
             plt.suptitle("Gradient Decent")
             plt.legend()
+
+
         for i in range(iterations):
-            for batch in iterate_minibatches(X, y, batch_size):
+            if show_loss == True:
+                training_loss.append(self.loss(X_train,y_train))
+                validation_loss.append(self.loss(X_val,y_val))
+
+            for batch in iterate_minibatches(X_train, y_train, batch_size):
                 X_mini, y_mini = batch
                 mini_vectorX = generateXvector(X_mini) #create the parameter vector
                 gradients = 2/m * mini_vectorX.T.dot(mini_vectorX.dot(theta) - y_mini) #diferentiate loss with respect to theta(weights)
                 theta = theta - learningrate * gradients #move gradients in opposite direction to the increase of loss multiplied be the learning rate factor
-                if plot == True:
-                    hypothesis_line.set_xdata(X) #update x and y values and draw new line
-                    y_pred = X.dot(theta[1:])
-                    hypothesis_line.set_ydata(y_pred)
-                    training_data.set_offsets(np.c_[X_mini,y_mini])
-                    fig.canvas.draw()
-                    fig.canvas.flush_events()
-                    plt.title(f"Itteration {i} of {iterations}")
+                self.bias = theta[0]
+                self.weight = theta[1:]
+            
+            if plot == True:
+                hypothesis_line.set_xdata(X_train) #update x and y values and draw new line
+                y_pred = self.predict(X_train)
+                hypothesis_line.set_ydata(y_pred)
+                #training_data.set_offsets(np.c_[X_mini,y_mini])
+                fig.canvas.draw()
+                fig.canvas.flush_events()
+                plt.title(f"Itteration {i} of {iterations}")
 
-        y_pred = X.dot(theta[1:]) #calculate predictions
-        loss = 1/m *sum((y_pred - y)**2)  #calculate the loss from predictions made
-        self.bias = theta[0]
-        self.weight = theta[1:]
+        if show_loss == True:
+            x_values = range(10,iterations)
+            plt.subplot(2, 1, 1)
+            plt.scatter(X_train,y_train,color = 'g',label = 'Training set')  
+            plt.scatter(X_val,y_val,color = 'r',label = 'Validation set',marker="2")
+            plt.plot(X_train,self.predict(X_train),color = 'k',label = 'fitted hypothesis')
+            plt.ylabel('Y data')
+            plt.xlabel('X data')
+            plt.legend()
+            plt.title("Training and Validation set")
+            plt.subplot(2, 1, 2)
+            plt.plot(x_values,training_loss[10:],label='Training Loss')
+            plt.plot(x_values,validation_loss[10:],label='Validation Loss') 
+            plt.legend()
+            plt.title("Bias and Variation: Plot of Loss's")
+            plt.ylabel('Loss')
+            plt.xlabel('Epoch')
+            plt.show()       
+
         return self
 
 
@@ -153,50 +191,47 @@ class linear_regression():
         X_training_batches,y_training_batches = CV_training_batches(X_train,y_train,num_training_batches)
         parameter_combinations = list(product(learningrate_param, iterations_param,batch_size_param)) #create a list of all posible parameter value combinations
         batch_indexs = range(0,num_training_batches)
-        parameter_training_scores = []
+        parameter_validation_scores = []
         parameter_score = []
         for parameter in parameter_combinations: #for each parameter combination
-            training_avg_score = []
+            validation_avg_score = []
             for training_batch in batch_indexs:#for each training batch fit the model and get the score of that batch
                 lin_reg_model.fit(X_training_batches[training_batch],y_training_batches[training_batch],plot=plot_on,learningrate=parameter[0],iterations=parameter[1],batch_size=parameter[2])
-                validation_scores = []
-                for i in batch_indexs:
-                 if i!=training_batch:
-                    validation_scores.append(lin_reg_model.score(X_training_batches[i],y_training_batches[i])) 
-                training_avg_score.append(mean(validation_scores))
-            parameter_training_scores.append(training_avg_score)
-            parameter_score.append(mean(training_avg_score))
+                validation_scores =  [lin_reg_model.score(X_training_batches[x],y_training_batches[x]) for x in batch_indexs if x != training_batch]
+                validation_avg_score.append(mean(validation_scores))
+            parameter_validation_scores.append(validation_avg_score)
+            parameter_score.append(mean(validation_avg_score))
 
-        grid_search_results = pd.DataFrame({'Parameters':parameter_combinations,'Training Scores':parameter_training_scores,'Parameter Score':parameter_score})
+        grid_search_results = pd.DataFrame({'Parameters':parameter_combinations,'Average Validation Scores per Training batch':parameter_validation_scores,'Parameter Score':parameter_score})
         return grid_search_results.sort_values(by=['Parameter Score'],ascending=False)
 
 
 
 if __name__ == "__main__":
     plot_on = False #display live plot of gradient decent and results of the 2 models 
+    optimise_hyperparameters = False
     X, y = datasets.fetch_california_housing(return_X_y=True)
     X = X[:,0:1] ##reduce parameters to 1
     y = y.reshape((-1, 1)) #convert to column vector
     X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.3)
 
-    
 
     lin_reg_model = linear_regression(X.shape[1])
-
     ######### HYPER PARAMETER OPTIMISATION ######### 
-    learningrate_param = [0.01,0.001,0.0001,0.00001,0.000001] #define the parameters and values to optimise for
-    iterations_param = [2,4,8,16,32,64,128,256]
-    batch_size_param = [32,64,128,256,512,1024]
-    grid_search_results = lin_reg_model.grid_search_CV(X_train,y_train,learningrate_param,iterations_param,batch_size_param)
-    print(grid_search_results.head())
-    optimum_parameters = grid_search_results['Parameters'].iloc[0]
+    if optimise_hyperparameters:
+        learningrate_param = [0.01,0.001,0.0001,0.00001,0.000001] #define the parameters and values to optimise for
+        iterations_param = [2,4,8,16,32,64,128,256]
+        batch_size_param = [32,64,128,256,512,1024]
+        grid_search_results = lin_reg_model.grid_search_CV(X_train,y_train,learningrate_param,iterations_param,batch_size_param)
+        print(grid_search_results.head())
+        optimum_parameters = grid_search_results['Parameters'].iloc[0]
 
 
     ######### Training model with optimum Hyperparameters ######### 
     start_time = time.time()
-    lin_reg_model.fit(X_train,y_train,plot=plot_on,learningrate=optimum_parameters[0],iterations=optimum_parameters[1],batch_size=optimum_parameters[2])
+    lin_reg_model.fit(X_train,y_train,plot=False,show_loss=True) #,learningrate=optimum_parameters[0],iterations=optimum_parameters[1],batch_size=optimum_parameters[2])
     time_to_fit = round(time.time() - start_time, 3)
-    scratch_score = lin_reg_model.score(X_train,y_train) # R^2 with training data
+    scratch_score = lin_reg_model.score(X_test,y_test) # R^2 with testing data
     scratch_mse = round(metrics.mean_squared_error(y_test, lin_reg_model.predict(X_test)),5) #MSE with test data
     print(f"Scratch score(R^2): {scratch_score} | Scratch MSE:{scratch_mse} | Time to fit {time_to_fit}s | Scratch models coefs:{lin_reg_model.weight} | Intercept:{lin_reg_model.bias}")
     plot_on = True
@@ -209,15 +244,17 @@ if __name__ == "__main__":
         plt.scatter(X_test, y_test,color='k',label='Real Test Data', marker="2",zorder=3)
         plt.ylabel('House Value')
         plt.legend()
+        plt.ylabel('Y data')
+        plt.xlabel('X data')
         plt.title(f'Made from scratch Linear Regression - Score {scratch_score} | Time to fit {time_to_fit}s')
 
     ######### Compare with SKlean ######### 
     start_time = time.time()
     sklearn_model = linear_model.LinearRegression().fit(X_train, y_train) #create instance of the linear regression model
     time_to_fit = round(time.time() - start_time, 3)
-    sklearn_score = sklearn_model.score(X_train,y_train)
+    sklearn_score = sklearn_model.score(X_test,y_test)
     sklearn_mse = round(metrics.mean_squared_error(y_test, sklearn_model.predict(X_test)),5)
-    print(f"Sklearn score(R^2): {sklearn_score} | Sklearn MSE:{sklearn_mse} | Time to fit {time_to_fit}s |SKlearn coefs:{sklearn_model.coef_} | Intercept:{sklearn_model.intercept_}")
+    print(f"Sklearn score(R^2): {round(sklearn_score,4)} | Sklearn MSE:{sklearn_mse} | Time to fit {time_to_fit}s |SKlearn coefs:{sklearn_model.coef_} | Intercept:{sklearn_model.intercept_}")
     if plot_on:
         plt.subplot(2, 1, 2)
         plt.scatter(X_train,y_train ,color='g', label='Training Data',zorder=0)
@@ -226,5 +263,7 @@ if __name__ == "__main__":
         plt.scatter(X_test, y_test,color='k',label='Real Test Data', marker="2",zorder=3)
         plt.ylabel('House Value')
         plt.legend()
-        plt.title(f'SKlearn Linear Regression - Score {sklearn_score} | Time to fit {time_to_fit}s')
+        plt.ylabel('Y data')
+        plt.xlabel('X data')
+        plt.title(f'SKlearn Linear Regression - Score {round(sklearn_score,4)} | Time to fit {time_to_fit}s')
         plt.show()

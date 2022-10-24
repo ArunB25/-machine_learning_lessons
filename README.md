@@ -35,6 +35,9 @@ This script compares a several individual features from the califronia housing d
 ---
 
 ### **linear_regression_from_scratch.py**
+This script is a culminataion of many tasks to learn about linear regression by creating it from scratch, and optimising the model with various techniques
+
+Basic outline of construction of the script
 1. Load in the California dataset for testing and debugging
 2. Create a class called LinearRegression
 3. Randomly initialise two attributes for the weight and bias
@@ -43,7 +46,8 @@ This script compares a several individual features from the califronia housing d
 6. Create a .fit method which uses gradient descent to optimise the model
 7. Compare created model to SKlearns linear regression model
 
-### Gradient Decent    
+### **Topics carried out to learn about and improve the model**
+#### **Gradient Decent**  
 Break down of the algorithm
 1. Make predictions Ypred = WX + b
 2. Evaluate Loss L = 1/m[ (Ypred - Y)^2 ]
@@ -66,8 +70,16 @@ Derivation to of loss with respect to weights
 
 5. Repeat for n itterations
 
-#### Mini batching
+#### **Mini batching**
 It can be very time consuming performing gradient decent calculations for the entire training data set every itteration. Mini batching invloves splitting the training data (full batch) up into smaller equally sized subsets (mini batches) which will be evalued over each epoch (on pass of entire training data). This process ensures that there will be enough memory free for the calculations if there is a very large training set.
 
-#### Hyper parameter optimisation
+#### **Hyper parameter optimisation**
 To find the optimal hyperparameters cross validation was use with a grid search. So that the model doesnt over fit, cross validation was used, this is when the training data is split up into training data and valdiation data which is used to attain the score of the test. In this case, the training data was split into 5 even subsets, then each one is used to train the data and the other 4 is used to validate it and get a score. This is repeated for all 5 subsets with each one having a turn to train the model whilst the others validate the results. This process is repeated in the grid seach which tests every possible combination of a list of pramaters to assertain the optima hyperparameters for the dataset.
+
+#### **Bias and Variance**
+
+Bias is when the average of the difference between the predicted parameters and true parameters of the training set. This represents how well the model is trained on the training set and could indicate if the capacity of the model could be increased.
+
+Variance is when you expect the predicted best parameters to be different from their average value. This represents how the model may vary with different datasets to see if the model is overfitting.
+
+https://www.youtube.com/watch?v=EuBBz3bI-aA
