@@ -83,3 +83,26 @@ Bias is when the average of the difference between the predicted parameters and 
 Variance is when you expect the predicted best parameters to be different from their average value. This represents how the model may vary with different datasets to see if the model is overfitting.
 
 https://www.youtube.com/watch?v=EuBBz3bI-aA
+
+
+---
+### **Regularization-Experiments.py**
+
+Regularizing a polynomial model's capacity
+
+1. create a (20 by 1) matrix of random x values between 0 and 1
+    these will be our design matrix (20 examples, 1 feature)
+2. defing some function which takes in those single feature examples and returns a new design matrix with an extra column representing the x-squared values
+3. generalise this function to be able to return you features which are powers of x up to some number
+4. define a function which computes a label such as y = 2 + x + 0.2*x^2 + 0.1*x^2
+5. visualise this on a X-Y graph and play around with the coefficients until you get a function that is not too boring (linear)
+6. split the data into train and val
+7. fit a model to these labels, firstly just passing your model the original features (x^1)
+8. visualise the predictions against the label
+9. you should see that the model is underfit
+10. now train a series of models on design matrix that contain sequentially increasing powers of x
+11. include powers of x way above those which your labels are based on
+e.g. go up to features where x^12 is included
+12. the models trained on these should overfit the data (easy to do if you make the train set small)
+13. grid search over the capacity hyperparam (which power of x is included) to evaluate each model on the train and val set
+14. dicsuss: what were the results?"
