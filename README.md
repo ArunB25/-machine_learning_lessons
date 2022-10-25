@@ -35,6 +35,9 @@ This script compares a several individual features from the califronia housing d
 ---
 
 ### **linear_regression_from_scratch.py**
+This script is a culminataion of many tasks to learn about linear regression by creating it from scratch, and optimising the model with various techniques
+
+Basic outline of construction of the script
 1. Load in the California dataset for testing and debugging
 2. Create a class called LinearRegression
 3. Randomly initialise two attributes for the weight and bias
@@ -43,7 +46,8 @@ This script compares a several individual features from the califronia housing d
 6. Create a .fit method which uses gradient descent to optimise the model
 7. Compare created model to SKlearns linear regression model
 
-### Gradient Decent    
+### **Topics carried out to learn about and improve the model**
+#### **Gradient Decent**  
 Break down of the algorithm
 1. Make predictions Ypred = WX + b
 2. Evaluate Loss L = 1/m[ (Ypred - Y)^2 ]
@@ -66,8 +70,39 @@ Derivation to of loss with respect to weights
 
 5. Repeat for n itterations
 
-#### Mini batching
+#### **Mini batching**
 It can be very time consuming performing gradient decent calculations for the entire training data set every itteration. Mini batching invloves splitting the training data (full batch) up into smaller equally sized subsets (mini batches) which will be evalued over each epoch (on pass of entire training data). This process ensures that there will be enough memory free for the calculations if there is a very large training set.
 
-#### Hyper parameter optimisation
+#### **Hyper parameter optimisation**
 To find the optimal hyperparameters cross validation was use with a grid search. So that the model doesnt over fit, cross validation was used, this is when the training data is split up into training data and valdiation data which is used to attain the score of the test. In this case, the training data was split into 5 even subsets, then each one is used to train the data and the other 4 is used to validate it and get a score. This is repeated for all 5 subsets with each one having a turn to train the model whilst the others validate the results. This process is repeated in the grid seach which tests every possible combination of a list of pramaters to assertain the optima hyperparameters for the dataset.
+
+#### **Bias and Variance**
+
+Bias is when the average of the difference between the predicted parameters and true parameters of the training set. This represents how well the model is trained on the training set and could indicate if the capacity of the model could be increased.
+
+Variance is when you expect the predicted best parameters to be different from their average value. This represents how the model may vary with different datasets to see if the model is overfitting.
+
+https://www.youtube.com/watch?v=EuBBz3bI-aA
+
+
+---
+### **Regularization-Experiments.py**
+
+Regularizing a polynomial model's capacity
+
+1. create a (20 by 1) matrix of random x values between 0 and 1
+    these will be our design matrix (20 examples, 1 feature)
+2. defing some function which takes in those single feature examples and returns a new design matrix with an extra column representing the x-squared values
+3. generalise this function to be able to return you features which are powers of x up to some number
+4. define a function which computes a label such as y = 2 + x + 0.2*x^2 + 0.1*x^2
+5. visualise this on a X-Y graph and play around with the coefficients until you get a function that is not too boring (linear)
+6. split the data into train and val
+7. fit a model to these labels, firstly just passing your model the original features (x^1)
+8. visualise the predictions against the label
+9. you should see that the model is underfit
+10. now train a series of models on design matrix that contain sequentially increasing powers of x
+11. include powers of x way above those which your labels are based on
+e.g. go up to features where x^12 is included
+12. the models trained on these should overfit the data (easy to do if you make the train set small)
+13. grid search over the capacity hyperparam (which power of x is included) to evaluate each model on the train and val set
+14. dicsuss: what were the results?"
